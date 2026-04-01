@@ -1,0 +1,27 @@
+{
+    "name": "Video Downloader by KiKoSo",
+    "short_name": "VideoDown",
+    "description": "Descarga videos de cualquier plataforma",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0a0a1a",
+    "theme_color": "#0a0a1a",
+    "orientation": "portrait",
+    "icons": [
+        {
+            "src": "/static/icons/icon.svg",
+            "sizes": "192x192 512x512",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        }
+    ],
+    "share_target": {
+        "action": "/share",
+        "method": "GET",
+        "params": {
+            "title": "title",
+            "text": "text",
+            "url": "url"
+        }
+    }
+}

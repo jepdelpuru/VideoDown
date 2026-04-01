@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Video Downloader - Descarga videos de cualquier plataforma">
+    <title>Video Downloader</title>
+    <link rel="manifest" href="{{ url_for('manifest') }}">
+    <meta name="theme-color" content="#0a0a1a">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon.svg') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=1.8">
+</head>
+
+<body>
+    <!-- Background -->
+    <div class="bg-animation">
+        <div class="bg-orb"></div>
+        <div class="bg-orb"></div>
+        <div class="bg-orb"></div>
+    </div>
+    <div class="grid-bg"></div>
+
+    <!-- Navigation -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-brand">
+            <div class="nav-logo">
+                <i class="fas fa-download"></i>
+            </div>
+            <span class="nav-title">VideoDown</span>
+            <span class="nav-by-kikoso">by KiKoSo</span>
+        </div>
+        <div class="nav-actions">
+            {% if is_admin %}
+            <button class="nav-btn" id="btnUsers" title="Gestionar usuarios">
+                <i class="fas fa-users"></i>
+                <span class="nav-btn-text">Usuarios</span>
+            </button>
+            {% endif %}
+            <div class="nav-queue-indicator" id="navQueueIndicator" title="Cola de descargas" style="display: none;">
+                <i class="fas fa-layer-group"></i>
+                <span id="navQueueCount">0</span>
+            </div>
+            <div class="nav-quota" id="navQuota" title="Cuota de descarga restante">
+                <i class="fas fa-hdd"></i>
+                <span id="quotaText">--</span>
+            </div>
+            <div class="nav-user">
+                <i class="fas fa-user-circle"></i>
+                <span>{{ username }}</span>
+            </div>
+            <a href="{{ url_for('logout') }}" class="nav-btn nav-btn-logout" title="Cerrar sesión">
+                <i class="fas fa-sign-out-alt"></i>
+            </a>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- URL Input Section -->
+        <section class="url-section" id="urlSection">
+            <div class="section-header">
+                <h1 class="section-title">
+                    <span class="title-gradient">Descarga Videos</span>
+                </h1>
+                <p class="section-subtitle">Pega la URL del video que quieres descargar</p>
+            </div>
+
+            <div class="url-input-container">
+                <div class="url-input-wrapper">
+                    <i class="fas fa-link url-icon"></i>
+                    <input type="text" id="urlInput" class="url-input" placeholder="https://www.youtube.com/watch?v=..."
+                        autocomplete="off" spellcheck="false">
+                    <button class="url-paste-btn" id="btnPaste" title="Pegar desde portapapeles">
+                        <i class="fas fa-paste"></i>
+                    </button>
+                </div>
+                <button class="analyze-btn" id="btnAnalyze">
+                    <i class="fas fa-search"></i>
+                    <span>Analizar</span>
+                </button>
+            </div>
+
+            <div class="supported-sites">
+                <span class="supported-label">Sitios soportados:</span>
+                <div class="site-badges">
+                    <span class="site-badge"><i class="fab fa-youtube"></i> YouTube</span>
+                    <span class="site-badge"><i class="fab fa-tiktok"></i> TikTok</span>
+                    <span class="site-badge"><i class="fab fa-instagram"></i> Instagram</span>
+                    <span class="site-badge"><i class="fab fa-twitter"></i> Twitter/X</span>
+                    <span class="site-badge"><i class="fab fa-facebook"></i> Facebook</span>
+                    <span class="site-badge"><i class="fab fa-twitch"></i> Twitch</span>
+                    <span class="site-badge"><i class="fas fa-plus"></i> +1000</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Status Messages -->
+        <div class="status-container" id="statusContainer" style="display: none;">
+            <div class="status-card" id="statusCard">
+                <div class="status-icon" id="statusIcon">
+                    <div class="spinner"></div>
+                </div>
+                <p class="status-message" id="statusMessage">Analizando...</p>
+            </div>
+        </div>
+
+        <!-- Video Info Section -->
+        <section class="video-section" id="videoSection" style="display: none;">
+            <div class="video-card">
+                <div class="video-header">
+                    <div class="video-thumbnail-container">
+                        <img id="videoThumbnail" class="video-thumbnail" src="" alt="Thumbnail">
+                        <div class="video-duration" id="videoDuration"></div>
+                    </div>
+                    <div class="video-info">
+                        <h2 class="video-title" id="videoTitle"></h2>
+                        <div class="video-meta">
+                            <span class="video-meta-item" id="videoUploader">
+                                <i class="fas fa-user"></i> <span></span>
+                            </span>
+                            <span class="video-meta-item" id="videoViews">
+                                <i class="fas fa-eye"></i> <span></span>
+                            </span>
+                            <span class="video-meta-item" id="videoSource">
+                                <i class="fas fa-globe"></i> <span></span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Download Options -->
+                <div class="options-container">
+                    <h3 class="options-title"><i class="fas fa-sliders-h"></i> Opciones de descarga</h3>
+
+                    <!-- Playlist Selection -->
+                    <div class="option-group" id="playlistGroup" style="display: none;">
+                        <label class="option-label">
+                            <i class="fas fa-list"></i> Videos a descargar
+                            (<span id="playlistCount">0</span> seleccionados)
+                        </label>
+                        <div class="playlist-controls" style="display: flex; gap: 8px; margin-bottom: 12px;">
+                            <button class="btn btn-secondary btn-small" id="btnSelectAllPlaylist"
+                                style="flex:1; padding: 6px; border-radius: 6px; cursor: pointer; background: rgba(255,255,255,0.1); border:none; color: white;">Seleccionar
+                                todos</button>
+                            <button class="btn btn-secondary btn-small" id="btnSelectNonePlaylist"
+                                style="flex:1; padding: 6px; border-radius: 6px; cursor: pointer; background: rgba(255,255,255,0.1); border:none; color: white;">Quitar
+                                todos</button>
+                        </div>
+                        <div class="playlist-list" id="playlistList"
+                            style="max-height: 200px; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                            <!-- Insert dynamically here -->
+                        </div>
+                    </div>
+
+                    <!-- Quality Selection -->
+                    <div class="option-group">
+                        <label class="option-label">Calidad</label>
+                        <div class="quality-grid" id="qualityGrid">
+                            <!-- Dynamically populated -->
+                        </div>
+                    </div>
+
+                    <!-- Advanced Options Toggle -->
+                    <button class="advanced-toggle" id="btnAdvanced">
+                        <i class="fas fa-cog"></i>
+                        <span>Opciones avanzadas</span>
+                        <i class="fas fa-chevron-down toggle-arrow"></i>
+                    </button>
+
+                    <div class="advanced-options" id="advancedOptions" style="display: none;">
+                        <!-- Format Selection (video only) -->
+                        <div class="option-group" id="formatGroupContainer">
+                            <label class="option-label">Formato de salida</label>
+                            <div class="radio-group" id="formatGroup">
+                                <label class="radio-option">
+                                    <input type="radio" name="format" value="mp4" checked>
+                                    <span class="radio-custom"></span>
+                                    <span>MP4</span>
+                                </label>
+                                <label class="radio-option">
+                                    <input type="radio" name="format" value="mkv">
+                                    <span class="radio-custom"></span>
+                                    <span>MKV</span>
+                                </label>
+                                <label class="radio-option">
+                                    <input type="radio" name="format" value="webm">
+                                    <span class="radio-custom"></span>
+                                    <span>WebM</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Audio Quality (MP3 only) -->
+                        <div class="option-group" id="audioQualityGroup" style="display: none;">
+                            <label class="option-label">Calidad de audio (MP3)</label>
+                            <select class="option-select" id="audioQuality">
+                                <option value="320">320 kbps (Alta)</option>
+                                <option value="256">256 kbps</option>
+                                <option value="192" selected>192 kbps (Estándar)</option>
+                                <option value="128">128 kbps (Baja)</option>
+                            </select>
+                        </div>
+
+                        <!-- Subtitle Language (only if subtitles available) -->
+                        <div class="option-group" id="subtitleLangGroup" style="display: none;">
+                            <label class="option-label">Idioma de subtítulos</label>
+                            <input type="text" class="option-input" id="subtitleLang" value="es,en"
+                                placeholder="es,en,fr">
+                        </div>
+
+                        <!-- Toggle Options -->
+                        <div class="toggle-options">
+                            <label class="toggle-option" id="thumbnailOption" style="display: none;">
+                                <input type="checkbox" id="embedThumbnail">
+                                <span class="toggle-switch"></span>
+                                <span class="toggle-text">
+                                    <i class="fas fa-image"></i> Incrustar miniatura
+                                </span>
+                            </label>
+                            <label class="toggle-option" id="subtitlesOption" style="display: none;">
+                                <input type="checkbox" id="embedSubtitles">
+                                <span class="toggle-switch"></span>
+                                <span class="toggle-text">
+                                    <i class="fas fa-closed-captioning"></i> Incrustar subtítulos
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Download Button -->
+                    <button class="download-btn" id="btnDownload" disabled>
+                        <i class="fas fa-download"></i>
+                        <span>Selecciona una calidad</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Progress Section -->
+        <section class="progress-section" id="progressSection" style="display: none;">
+            <div class="progress-card">
+                <div class="progress-header">
+                    <h3 class="progress-title" id="progressTitle">
+                        <i class="fas fa-download"></i> Descargando...
+                    </h3>
+                    <button class="cancel-btn" id="btnCancel" title="Cancelar descarga">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                </div>
+
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="progressBar">
+                        <div class="progress-fill" id="progressFill"></div>
+                        <div class="progress-glow" id="progressGlow"></div>
+                    </div>
+                    <div class="progress-percentage" id="progressPercentage">0%</div>
+                </div>
+
+                <div class="progress-details">
+                    <div class="progress-detail" id="detailSpeed">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>Velocidad: --</span>
+                    </div>
+                    <div class="progress-detail" id="detailSize">
+                        <i class="fas fa-file"></i>
+                        <span>Tamaño: --</span>
+                    </div>
+                    <div class="progress-detail" id="detailETA">
+                        <i class="fas fa-clock"></i>
+                        <span>ETA: --</span>
+                    </div>
+                </div>
+
+                <div class="progress-status" id="progressStatus">
+                    <div class="status-dot"></div>
+                    <span>Preparando descarga...</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Download Queue Section -->
+        <section class="queue-section" id="queueSection" style="display: none;">
+            <div class="queue-card">
+                <div class="queue-header">
+                    <h3 class="queue-title">
+                        <i class="fas fa-layer-group"></i> Cola de descargas
+                        <span class="queue-count-badge" id="queueCountBadge">0</span>
+                    </h3>
+                    <button class="clear-queue-btn" id="btnClearQueue" title="Limpiar cola">
+                        <i class="fas fa-trash-alt"></i> Limpiar
+                    </button>
+                </div>
+                <div class="queue-list" id="queueList">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Download Complete Section -->
+        <section class="complete-section" id="completeSection" style="display: none;">
+            <div class="complete-card">
+                <div class="complete-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <h3 class="complete-title">¡Descarga completada!</h3>
+                <p class="complete-info" id="completeInfo"></p>
+                <div class="complete-actions">
+                    <a class="save-btn" id="btnSave" href="#" download>
+                        <i class="fas fa-save"></i> Guardar archivo
+                    </a>
+                    <button class="new-download-btn" id="btnNewDownload">
+                        <i class="fas fa-plus"></i> Nueva descarga
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Recent Downloads Section -->
+        <section class="recent-section" id="recentSection" style="display: none;">
+            <div class="recent-card">
+                <div class="recent-header">
+                    <h3 class="recent-title">
+                        <i class="fas fa-history"></i> Descargas recientes
+                    </h3>
+                    <span class="recent-subtitle">Disponibles durante 1 hora</span>
+                </div>
+                <div class="recent-list" id="recentList">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Saved Videos Section -->
+        <section class="saved-section" id="savedSection" style="display: none;">
+            <div class="recent-card">
+                <div class="recent-header">
+                    <h3 class="recent-title">
+                        <i class="fas fa-bookmark"></i> Videos guardados
+                    </h3>
+                    <span class="recent-subtitle">Sin fecha de expiración</span>
+                </div>
+                <!-- Collection Tabs -->
+                <div class="collection-tabs" id="collectionTabs">
+                    <!-- Dynamically populated -->
+                </div>
+                <div class="recent-list" id="savedList">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Collection Modal -->
+        <div class="modal-overlay" id="collectionModal" style="display:none;">
+            <div class="modal-card" style="max-width:400px;">
+                <div class="modal-header">
+                    <h3 id="collectionModalTitle"><i class="fas fa-folder-plus"></i> Nueva colección</h3>
+                    <button class="modal-close" id="btnCloseCollectionModal"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="modal-body" style="padding:20px;">
+                    <div class="form-group" style="margin-bottom:16px;">
+                        <label style="display:block;margin-bottom:6px;font-size:0.85rem;color:var(--text-secondary);">Nombre</label>
+                        <input type="text" id="collectionNameInput" class="input-field" placeholder="Ej: Música, Tutoriales..." maxlength="50" style="width:100%;padding:10px 14px;background:var(--bg-tertiary);border:1px solid var(--border-color);border-radius:10px;color:var(--text-primary);font-size:0.95rem;">
+                    </div>
+                    <div class="form-group" style="margin-bottom:20px;">
+                        <label style="display:block;margin-bottom:8px;font-size:0.85rem;color:var(--text-secondary);">Color</label>
+                        <div class="color-picker" id="colorPicker" style="display:flex;gap:8px;flex-wrap:wrap;">
+                            <button class="color-swatch active" data-color="#8b5cf6" style="width:32px;height:32px;border-radius:50%;border:3px solid transparent;background:#8b5cf6;cursor:pointer;transition:all .2s;"></button>
+                            <button class="color-swatch" data-color="#ef4444" style="width:32px;height:32px;border-radius:50%;border:3px solid transparent;background:#ef4444;cursor:pointer;transition:all .2s;"></button>
+                            <button class="color-swatch" data-color="#f59e0b" style="width:32px;height:32px;border-radius:50%;border:3px solid transparent;background:#f59e0b;cursor:pointer;transition:all .2s;"></button>
+                            <button class="color-swatch" data-color="#22c55e" style="width:32px;height:32px;border-radius:50%;border:3px solid transparent;background:#22c55e;cursor:pointer;transition:all .2s;"></button>
+                            <button class="color-swatch" data-color="#06b6d4" style="width:32px;height:32px;border-radius:50%;border:3px solid transparent;background:#06b6d4;cursor:pointer;transition:all .2s;"></button>
+                            <button class="color-swatch" data-color="#3b82f6" style="width:32px;height:32px;border-radius:50%;border:3px solid transparent;background:#3b82f6;cursor:pointer;transition:all .2s;"></button>
+                            <button class="color-swatch" data-color="#ec4899" style="width:32px;height:32px;border-radius:50%;border:3px solid transparent;background:#ec4899;cursor:pointer;transition:all .2s;"></button>
+                            <button class="color-swatch" data-color="#f97316" style="width:32px;height:32px;border-radius:50%;border:3px solid transparent;background:#f97316;cursor:pointer;transition:all .2s;"></button>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:10px;">
+                        <button id="btnSaveCollection" class="btn-action" style="flex:1;padding:11px;border-radius:10px;border:none;background:var(--primary);color:white;font-weight:600;cursor:pointer;font-size:0.9rem;">
+                            <i class="fas fa-check"></i> Guardar
+                        </button>
+                        <button id="btnDeleteCollection" class="btn-action" style="display:none;padding:11px 16px;border-radius:10px;border:1px solid var(--danger);background:transparent;color:var(--danger);font-weight:600;cursor:pointer;font-size:0.9rem;">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Footer Branding -->
+        <footer class="app-footer">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <div class="footer-logo"><i class="fas fa-download"></i></div>
+                    <div class="footer-text">
+                        <span class="footer-name">Video<span class="footer-highlight">Down</span></span>
+                        <span class="footer-sub">Video downloader</span>
+                    </div>
+                </div>
+                <div class="footer-author">
+                    <i class="fas fa-code"></i> Desarrollado por <span class="footer-kikoso">KiKoSo</span>
+                </div>
+            </div>
+        </footer>
+    </main>
+
+    <!-- Fullscreen Player Modal -->
+    <div class="fp-overlay" id="playerOverlay" style="display: none;">
+        <div class="fp-bg-animation">
+            <div class="fp-bg-orb"></div>
+            <div class="fp-bg-orb"></div>
+            <div class="fp-bg-orb"></div>
+            <div class="fp-bg-orb"></div>
+        </div>
+        <div class="fp-grid-bg"></div>
+        <div class="fp-scanline"></div>
+
+        <button class="fp-close-btn" id="playerClose" title="Cerrar reproductor">
+            <i class="fas fa-times"></i>
+        </button>
+
+        <div class="fp-container">
+            <div class="fp-card">
+                <!-- Media Area -->
+                <div class="fp-media">
+                    <video id="playerVideo" autoplay playsinline style="display: none;"></video>
+                    <audio id="playerAudio" autoplay style="display: none;"></audio>
+                    <canvas id="playerAudioVisualizer" style="display: none;"></canvas>
+                    <div id="playerLiveStats" class="fp-live-stats" style="display: none;"></div>
+                    <div id="playerResumeBadge" class="fp-resume-badge" style="display: none;"></div>
+                    <!-- Custom Video Controls -->
+                    <div id="playerVideoControls" class="fp-vc" style="display: none;">
+                        <div class="fp-vc-seek-wrap" id="fpVideoSeekWrap">
+                            <div id="fpVideoSeekBuffered" class="fp-vc-seek-buffered"></div>
+                            <div id="fpVideoSeekProgress" class="fp-vc-seek-progress"></div>
+                            <div id="fpVideoSeekThumb" class="fp-vc-seek-thumb"></div>
+                            <input id="fpVideoSeekInput" type="range" min="0" max="1000" value="0" class="fp-vc-seek-input">
+                            <div id="fpVideoSeekPreview" class="fp-vc-seek-preview">0:00</div>
+                        </div>
+                        <div class="fp-vc-bar">
+                            <div class="fp-vc-left">
+                                <button id="fpVideoPlayBtn" class="fp-vc-btn fp-vc-play" title="Reproducir/Pausar">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                                <button id="fpVideoRwBtn" class="fp-vc-btn" title="Retroceder 10s">
+                                    <i class="fas fa-undo"></i>
+                                </button>
+                                <button id="fpVideoFfBtn" class="fp-vc-btn" title="Avanzar 10s">
+                                    <i class="fas fa-redo"></i>
+                                </button>
+                                <div class="fp-vc-time">
+                                    <span id="fpVideoTime">0:00</span>
+                                    <span class="fp-vc-time-sep">/</span>
+                                    <span id="fpVideoDuration">0:00</span>
+                                </div>
+                            </div>
+                            <div class="fp-vc-right">
+                                <div class="fp-vc-volume-wrap">
+                                    <button id="fpVideoVolBtn" class="fp-vc-btn" title="Volumen">
+                                        <i class="fas fa-volume-up"></i>
+                                    </button>
+                                    <input id="fpVideoVolInput" type="range" min="0" max="100" value="100" class="fp-vc-vol-input">
+                                </div>
+                                <button id="fpVideoFsBtn" class="fp-vc-btn" title="Pantalla completa">
+                                    <i class="fas fa-expand"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Custom Audio Controls -->
+                    <div id="playerAudioControls" class="fp-audio-controls" style="display: none;">
+                        <button id="fpAudioPlayBtn" class="fp-ac-play" title="Reproducir/Pausar">
+                            <i class="fas fa-play"></i>
+                        </button>
+                        <span id="fpAudioTime" class="fp-ac-time">0:00</span>
+                        <div id="fpAudioSeekBar" class="fp-ac-seek">
+                            <div id="fpAudioSeekBuffered" class="fp-ac-seek-buffered"></div>
+                            <div id="fpAudioSeekProgress" class="fp-ac-seek-progress"></div>
+                            <input id="fpAudioSeekInput" type="range" min="0" max="1000" value="0" class="fp-ac-seek-input">
+                        </div>
+                        <span id="fpAudioDuration" class="fp-ac-time">0:00</span>
+                        <div class="fp-ac-volume-wrap">
+                            <button id="fpAudioVolBtn" class="fp-ac-vol-btn" title="Volumen">
+                                <i class="fas fa-volume-up"></i>
+                            </button>
+                            <input id="fpAudioVolInput" type="range" min="0" max="100" value="100" class="fp-ac-vol-input">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Content Details -->
+                <div class="fp-details">
+                    <h1 class="fp-title" id="playerTitle">Reproduciendo...</h1>
+
+                    <!-- Quick Info Tags -->
+                    <div class="fp-quick-tags" id="playerQuickTags"></div>
+
+                    <!-- Technical Details Panel -->
+                    <div class="fp-tech-panel" id="playerTechPanel" style="display: none;">
+                        <div class="fp-tech-header" id="playerTechToggle">
+                            <div class="fp-tech-header-left">
+                                <i class="fas fa-terminal"></i> Datos Tecnicos
+                            </div>
+                            <i class="fas fa-chevron-down fp-toggle-icon"></i>
+                        </div>
+                        <div class="fp-tech-body" id="playerTechBody"></div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="fp-actions">
+                        <a href="#" class="fp-action-btn fp-download-btn" id="playerDownloadBtn" download style="display: none;">
+                            <i class="fas fa-download"></i> Descargar
+                        </a>
+                        <button id="playerPipBtn" class="fp-action-btn fp-secondary-btn" title="Picture-in-Picture" style="display: none;">
+                            <i class="fas fa-compress"></i> PiP
+                        </button>
+                        <button id="playerBgPlayBtn" class="fp-action-btn fp-secondary-btn" title="Mantener pantalla encendida">
+                            <i class="fas fa-moon"></i> Pantalla activa
+                        </button>
+                        <button id="playerShareBtn" class="fp-action-btn fp-secondary-btn" title="Compartir momento actual">
+                            <i class="fas fa-share-alt"></i> Compartir
+                        </button>
+                        <a id="playerOriginalBtn" class="fp-action-btn fp-secondary-btn" href="#" target="_blank" rel="noopener" title="Ver en la plataforma original" style="display: none;">
+                            <i class="fas fa-external-link-alt"></i> Original
+                        </a>
+                    </div>
+
+                    <div id="playerBgStatus" class="fp-status-badge">
+                        <span class="fp-pulse-dot"></span>
+                        <span id="playerBgStatusText">Pantalla activa</span>
+                    </div>
+
+                    <!-- Footer Branding -->
+                    <div class="fp-footer">
+                        <div class="fp-brand-block">
+                            <div class="fp-brand-logo"><i class="fas fa-download"></i></div>
+                            <div class="fp-brand-text">
+                                <span class="fp-brand-name">Video<span class="fp-brand-highlight">Down</span></span>
+                                <span class="fp-brand-sub">by KiKoSo</span>
+                            </div>
+                        </div>
+                        <div class="fp-brand-author">
+                            <i class="fas fa-code"></i> Desarrollado por <span class="fp-author-name">KiKoSo</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Users Modal (admin only) -->
+    {% if is_admin %}
+    <div class="modal-overlay" id="usersModal" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2><i class="fas fa-users"></i> Gestión de Usuarios</h2>
+                <button class="modal-close" id="btnCloseModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Create User Form -->
+                <div class="create-user-section">
+                    <h3><i class="fas fa-user-plus"></i> Crear nuevo usuario</h3>
+                    <form id="createUserForm" class="create-user-form">
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label>Usuario</label>
+                                <input type="text" id="newUsername" placeholder="Nombre de usuario" required
+                                    minlength="3">
+                            </div>
+                            <div class="form-field">
+                                <label>Contraseña</label>
+                                <input type="password" id="newPassword" placeholder="Contraseña" required minlength="6">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <label class="toggle-option compact">
+                                <input type="checkbox" id="newIsAdmin">
+                                <span class="toggle-switch small"></span>
+                                <span class="toggle-text">Administrador</span>
+                            </label>
+                            <button type="submit" class="create-btn">
+                                <i class="fas fa-plus"></i> Crear
+                            </button>
+                        </div>
+                    </form>
+                    <div class="form-message" id="formMessage" style="display: none;"></div>
+                </div>
+
+                <!-- Users List -->
+                <div class="users-list-section">
+                    <h3><i class="fas fa-list"></i> Usuarios registrados</h3>
+                    <div class="users-list" id="usersList">
+                        <div class="loading-users">
+                            <div class="spinner small"></div>
+                            <span>Cargando usuarios...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Trim Modal -->
+    <div class="modal-overlay" id="trimModal" style="display: none;">
+        <div class="modal-card trim-modal-card">
+            <div class="modal-header">
+                <h2><i class="fas fa-cut"></i> Recortar Video</h2>
+                <button class="modal-close" id="btnCloseTrimModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="modal-body trim-modal-body">
+                <div class="trim-video-container">
+                    <video id="trimVideoPlayer" controls preload="metadata"></video>
+                </div>
+
+                <div class="trim-controls">
+                    <div class="trim-timeline" id="trimTimeline">
+                        <div class="trim-progress" id="trimProgress"></div>
+                        <div class="trim-handle trim-handle-start" id="trimHandleStart">
+                            <span class="trim-time-tooltip" id="trimTooltipStart">00:00</span>
+                        </div>
+                        <div class="trim-handle trim-handle-end" id="trimHandleEnd">
+                            <span class="trim-time-tooltip" id="trimTooltipEnd">00:00</span>
+                        </div>
+                        <div class="trim-selection" id="trimSelection"></div>
+                    </div>
+
+                    <div class="trim-inputs">
+                        <div class="form-field">
+                            <label>Inicio</label>
+                            <input type="text" id="trimInputStart" value="00:00:00" readonly>
+                        </div>
+                        <div class="form-field">
+                            <label>Fin</label>
+                            <input type="text" id="trimInputEnd" value="00:00:00" readonly>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="trim-actions">
+                    <button class="trim-btn cancel-btn" id="btnCancelTrim">Cancelar</button>
+                    <button class="trim-btn confirm-btn" id="btnConfirmTrim">
+                        <i class="fas fa-cut"></i> Recortar y Descargar
+                    </button>
+                    <!-- Status display for trim process -->
+                    <span id="trimStatusText"
+                        style="display:none; margin-left: 10px; font-size: 0.9em; color: var(--text-muted);">Procesando...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.4/socket.io.min.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}?v=2.4"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            // Listen for SW clear message and reload
+            navigator.serviceWorker.addEventListener('message', (e) => {
+                if (e.data && e.data.type === 'SW_CLEARED') window.location.reload();
+            });
+            // Force update the SW (browser compares bytes, will install new one)
+            navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' })
+                .then(reg => reg.update());
+        }
+    </script>
+</body>
+
+</html>

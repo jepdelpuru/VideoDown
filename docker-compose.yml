@@ -1,0 +1,25 @@
+services:
+  videodown:
+    build: .
+    container_name: videodown_web
+    restart: unless-stopped
+    ports:
+      - "5080:5000"
+    volumes:
+      - .:/app
+      - ./downloads:/app/downloads
+    environment:
+      - PYTHONUNBUFFERED=1
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: videodown_tunnel
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${CF_TUNNEL_TOKEN}
+    depends_on:
+      - videodown

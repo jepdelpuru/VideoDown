@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="VideoDown by KiKoSo - Reproductor">
+    <title>{{ title if not error else 'Video no disponible' }} - VideoDown</title>
+    <meta name="theme-color" content="#0a0a1a">
+    {% if not error and thumbnail %}
+    <meta property="og:image" content="{{ thumbnail }}">
+    <meta property="og:title" content="{{ title }}">
+    <meta property="og:description" content="Reproducir video compartido con VideoDown by KiKoSo">
+    {% endif %}
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-primary: #050510;
+            --bg-card: rgba(12, 12, 35, 0.85);
+            --bg-card-inner: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.06);
+            --glass-border-hover: rgba(255, 255, 255, 0.12);
+            --accent-primary: #6366f1;
+            --accent-secondary: #8b5cf6;
+            --accent-tertiary: #a78bfa;
+            --accent-pink: #ec4899;
+            --accent-cyan: #22d3ee;
+            --accent-glow: rgba(99, 102, 241, 0.4);
+            --text-primary: #f0f0ff;
+            --text-secondary: #7c7c9a;
+            --text-tertiary: #4a4a6a;
+            --danger: #ef4444;
+            --success: #10b981;
+            --warning: #f59e0b;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            padding: 16px;
+            overflow-x: hidden;
+        }
+
+        /* === Animated Background === */
+        .bg-animation { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+        .bg-orb { position: absolute; border-radius: 50%; filter: blur(100px); opacity: 0.2; animation: float 25s ease-in-out infinite; }
+        .bg-orb:nth-child(1) { width: 600px; height: 600px; background: radial-gradient(circle, #6366f1, transparent 70%); top: -150px; left: -150px; }
+        .bg-orb:nth-child(2) { width: 500px; height: 500px; background: radial-gradient(circle, #8b5cf6, transparent 70%); bottom: -150px; right: -150px; animation-delay: -8s; }
+        .bg-orb:nth-child(3) { width: 350px; height: 350px; background: radial-gradient(circle, #ec4899, transparent 70%); top: 40%; left: 60%; animation-delay: -16s; }
+        .bg-orb:nth-child(4) { width: 250px; height: 250px; background: radial-gradient(circle, #22d3ee, transparent 70%); top: 20%; right: 20%; animation-delay: -12s; }
+        @keyframes float {
+            0%, 100% { transform: translateY(0) translateX(0) scale(1); }
+            25% { transform: translateY(-40px) translateX(25px) scale(1.08); }
+            50% { transform: translateY(25px) translateX(-20px) scale(0.92); }
+            75% { transform: translateY(-20px) translateX(-30px) scale(1.04); }
+        }
+
+        .grid-bg {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background-image:
+                linear-gradient(rgba(99, 102, 241, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(99, 102, 241, 0.02) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: 0; pointer-events: none;
+        }
+
+        /* Scanline effect */
+        .scanline {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 0; pointer-events: none;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+        }
+
+        /* === Main Container === */
+        .player-container {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 960px;
+            animation: pageIn 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            opacity: 0;
+            transform: translateY(40px) scale(0.98);
+        }
+        @keyframes pageIn { to { opacity: 1; transform: translateY(0) scale(1); } }
+
+        /* === Player Card === */
+        .player-card {
+            background: var(--bg-card);
+            border: 1px solid var(--glass-border);
+            border-radius: 28px;
+            overflow: hidden;
+            backdrop-filter: blur(40px);
+            -webkit-backdrop-filter: blur(40px);
+            box-shadow:
+                0 0 0 1px rgba(255,255,255,0.02) inset,
+                0 20px 60px rgba(0, 0, 0, 0.5),
+                0 0 120px rgba(99, 102, 241, 0.06);
+        }
+
+        /* === Video Area === */
+        .player-media {
+            width: 100%;
+            background: #000;
+            position: relative;
+            overflow: hidden;
+        }
+        .player-media::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            height: 80px;
+            background: linear-gradient(transparent, rgba(0,0,0,0.4));
+            pointer-events: none;
+            z-index: 1;
+        }
+        .player-media video, .player-media audio {
+            width: 100%;
+            display: block;
+            max-height: 70vh;
+            outline: none;
+            position: relative;
+            z-index: 2;
+        }
+        .player-media audio { padding: 50px 20px; }
+
+        /* === Status Badge (saved/expiring) === */
+        .video-status-badge {
+            position: absolute;
+            top: 16px; left: 16px;
+            z-index: 5;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            backdrop-filter: blur(12px);
+            opacity: 1;
+            transition: opacity 0.8s ease;
+            pointer-events: none;
+        }
+        .video-status-badge.fade-out {
+            opacity: 0;
+        }
+        .video-status-badge.saved {
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #34d399;
+        }
+        .video-status-badge.expiring {
+            background: rgba(245, 158, 11, 0.2);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            color: #fbbf24;
+        }
+        .video-status-badge .badge-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            animation: blink 2s ease-in-out infinite;
+        }
+        .video-status-badge.saved .badge-dot { background: #34d399; }
+        .video-status-badge.expiring .badge-dot { background: #fbbf24; }
+        @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        /* === Content Area === */
+        .player-details {
+            padding: 28px 32px 24px;
+        }
+
+        .player-title {
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+            letter-spacing: -0.03em;
+            line-height: 1.35;
+        }
+
+        /* === Quick Info Tags === */
+        .quick-tags {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        .quick-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            background: var(--bg-card-inner);
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            font-size: 0.78rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .quick-tag i { font-size: 0.7rem; }
+        .quick-tag.accent i { color: var(--accent-primary); }
+        .quick-tag.cyan i { color: var(--accent-cyan); }
+        .quick-tag.pink i { color: var(--accent-pink); }
+        .quick-tag.green i { color: var(--success); }
+        .quick-tag.warning i { color: var(--warning); }
+
+        /* === Technical Panel === */
+        .tech-panel {
+            margin-bottom: 22px;
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            overflow: hidden;
+            background: rgba(0, 0, 0, 0.2);
+        }
+        .tech-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 18px;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s;
+        }
+        .tech-header:hover { background: rgba(255,255,255,0.02); }
+        .tech-header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .tech-header-left i {
+            color: var(--accent-cyan);
+            font-size: 0.85rem;
+        }
+        .tech-header .toggle-icon {
+            color: var(--text-tertiary);
+            font-size: 0.75rem;
+            transition: transform 0.3s;
+        }
+        .tech-header.open .toggle-icon { transform: rotate(180deg); }
+
+        .tech-body {
+            display: none;
+            padding: 0 18px 18px;
+        }
+        .tech-body.open { display: block; }
+
+        .tech-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2px;
+        }
+        .tech-item {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            padding: 10px 12px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 10px;
+        }
+        .tech-item:hover { background: rgba(255, 255, 255, 0.04); }
+        .tech-label {
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .tech-value {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .tech-value.highlight { color: var(--accent-cyan); }
+        .tech-value.pink { color: var(--accent-pink); }
+
+        .tech-separator {
+            grid-column: 1 / -1;
+            height: 1px;
+            background: var(--glass-border);
+            margin: 4px 0;
+        }
+
+        .tech-section-label {
+            grid-column: 1 / -1;
+            font-size: 0.6rem;
+            font-weight: 700;
+            color: var(--accent-primary);
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            padding: 6px 12px 2px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* === Action Buttons === */
+        .player-actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 13px 26px;
+            color: white;
+            border: none;
+            border-radius: 14px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.88rem;
+            font-weight: 700;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        .action-btn i { font-size: 0.95rem; }
+        .action-btn::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%; right: 0; bottom: 0;
+            width: 300%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            transition: left 0.5s;
+        }
+        .action-btn:hover::before { left: 100%; }
+
+        .action-btn.download-btn {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.35);
+            flex: 1;
+            justify-content: center;
+        }
+        .action-btn.download-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 35px rgba(99, 102, 241, 0.55);
+        }
+
+        .action-btn.secondary-btn {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--glass-border);
+        }
+        .action-btn.secondary-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: var(--glass-border-hover);
+            transform: translateY(-2px);
+        }
+        .action-btn.secondary-btn.active {
+            background: rgba(16, 185, 129, 0.12);
+            border-color: rgba(16, 185, 129, 0.3);
+            color: #34d399;
+        }
+
+        .action-btn:active { transform: translateY(0) !important; }
+
+        /* Wake lock status */
+        .status-badge {
+            display: none;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 18px;
+            padding: 8px 14px;
+            background: rgba(16, 185, 129, 0.08);
+            border: 1px solid rgba(16, 185, 129, 0.15);
+            border-radius: 10px;
+            color: var(--success);
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .status-badge.visible { display: inline-flex; }
+        .status-badge .pulse-dot {
+            width: 7px; height: 7px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.75); }
+        }
+
+        /* === Branding Footer === */
+        .player-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-top: 18px;
+            border-top: 1px solid var(--glass-border);
+        }
+
+        .brand-block {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .brand-logo {
+            width: 34px; height: 34px;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-pink));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            color: white;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+        .brand-text {
+            display: flex;
+            flex-direction: column;
+        }
+        .brand-name {
+            font-size: 0.82rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            letter-spacing: -0.02em;
+        }
+        .brand-name .brand-highlight {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-pink));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .brand-sub {
+            font-size: 0.62rem;
+            color: var(--text-tertiary);
+            font-weight: 500;
+            letter-spacing: 0.3px;
+        }
+
+        .brand-author {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.68rem;
+            color: var(--text-tertiary);
+            font-weight: 500;
+        }
+        .brand-author .author-name {
+            font-weight: 700;
+            color: var(--accent-tertiary);
+        }
+
+        /* === Countdown Timer === */
+        .countdown-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 16px;
+            margin-bottom: 18px;
+            background: rgba(245, 158, 11, 0.06);
+            border: 1px solid rgba(245, 158, 11, 0.12);
+            border-radius: 12px;
+        }
+        .countdown-bar i { color: var(--warning); font-size: 0.85rem; }
+        .countdown-text {
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        .countdown-text strong {
+            color: var(--warning);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* === Error State === */
+        .error-container {
+            padding: 80px 40px;
+            text-align: center;
+        }
+        .error-icon {
+            font-size: 4rem;
+            margin-bottom: 24px;
+            opacity: 0.6;
+            background: linear-gradient(135deg, var(--danger), #f97316);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .error-title {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-bottom: 10px;
+        }
+        .error-text {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        /* === Responsive === */
+        @media (max-width: 640px) {
+            body { padding: 8px; }
+            .player-card { border-radius: 20px; }
+            .player-details { padding: 20px 18px 18px; }
+            .player-title { font-size: 1.1rem; }
+            .action-btn { padding: 12px 18px; font-size: 0.82rem; }
+            .action-btn.download-btn { flex: 1 1 100%; }
+            .tech-grid { grid-template-columns: 1fr 1fr; }
+            .player-footer { flex-direction: column; gap: 12px; align-items: flex-start; }
+            .quick-tags { gap: 6px; }
+            .quick-tag { padding: 4px 10px; font-size: 0.72rem; }
+        }
+        @media (max-width: 380px) {
+            .tech-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="bg-animation">
+        <div class="bg-orb"></div>
+        <div class="bg-orb"></div>
+        <div class="bg-orb"></div>
+        <div class="bg-orb"></div>
+    </div>
+    <div class="grid-bg"></div>
+    <div class="scanline"></div>
+
+    <div class="player-container">
+        <div class="player-card">
+            {% if error %}
+            <div class="error-container">
+                <div class="error-icon"><i class="fas fa-film"></i></div>
+                <h2 class="error-title">Video no disponible</h2>
+                <p class="error-text">{{ error }}</p>
+                <div style="margin-top: 30px;">
+                    <div class="brand-block" style="justify-content: center;">
+                        <div class="brand-logo"><i class="fas fa-download"></i></div>
+                        <div class="brand-text">
+                            <span class="brand-name">Video<span class="brand-highlight">Down</span></span>
+                            <span class="brand-sub">by KiKoSo</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <!-- Video Player -->
+            <div class="player-media">
+                {% if is_saved %}
+                <div class="video-status-badge saved">
+                    <span class="badge-dot"></span> Permanente
+                </div>
+                {% elif time_remaining %}
+                <div class="video-status-badge expiring">
+                    <span class="badge-dot"></span> <span id="expiryBadge">Expira en {{ time_remaining }}</span>
+                </div>
+                {% endif %}
+
+                {% if is_video %}
+                <video id="mediaPlayer" controls autoplay playsinline
+                       src="/api/public-stream/{{ token }}"
+                       {% if thumbnail %}poster="{{ thumbnail }}"{% endif %}>
+                    Tu navegador no soporta la reproduccion de video.
+                </video>
+                {% elif is_audio %}
+                <audio id="mediaPlayer" controls autoplay
+                       src="/api/public-stream/{{ token }}">
+                    Tu navegador no soporta la reproduccion de audio.
+                </audio>
+                {% else %}
+                <div class="error-container">
+                    <div class="error-icon"><i class="fas fa-file"></i></div>
+                    <h2 class="error-title">Formato no reproducible</h2>
+                    <p class="error-text">Este archivo no se puede reproducir en el navegador.</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Content Details -->
+            <div class="player-details">
+                <h1 class="player-title">{{ title }}</h1>
+
+                <!-- Quick Info Tags -->
+                <div class="quick-tags">
+                    {% if quality %}
+                    <span class="quick-tag accent"><i class="fas fa-video"></i> {{ quality }}</span>
+                    {% endif %}
+                    {% if file_size %}
+                    <span class="quick-tag cyan"><i class="fas fa-database"></i> {{ file_size }}</span>
+                    {% endif %}
+                    {% if media_info.get('duration') %}
+                    <span class="quick-tag pink"><i class="fas fa-clock"></i> <span id="durationTag">{{ '%d:%02d:%02d' % (media_info['duration'] // 3600, (media_info['duration'] % 3600) // 60, media_info['duration'] % 60) if media_info['duration'] >= 3600 else '%d:%02d' % (media_info['duration'] // 60, media_info['duration'] % 60) }}</span></span>
+                    {% endif %}
+                    {% if media_info.get('video_codec') %}
+                    <span class="quick-tag green"><i class="fas fa-microchip"></i> {{ media_info['video_codec'] }}</span>
+                    {% endif %}
+                    {% if media_info.get('fps') and media_info['fps'] > 0 %}
+                    <span class="quick-tag warning"><i class="fas fa-film"></i> {{ media_info['fps'] }} FPS</span>
+                    {% endif %}
+                    {% if media_info.get('audio_codec') %}
+                    <span class="quick-tag"><i class="fas fa-headphones"></i> {{ media_info['audio_codec'] }}</span>
+                    {% endif %}
+                </div>
+
+                <!-- Countdown for expiring videos -->
+                {% if not is_saved and expires_at %}
+                <div class="countdown-bar" id="countdownBar">
+                    <i class="fas fa-hourglass-half"></i>
+                    <span class="countdown-text">Este enlace expira en <strong id="countdownTimer">--:--</strong></span>
+                </div>
+                {% endif %}
+
+                <!-- Technical Details Panel -->
+                {% if media_info %}
+                <div class="tech-panel">
+                    <div class="tech-header" id="techToggle">
+                        <div class="tech-header-left">
+                            <i class="fas fa-terminal"></i> Datos Tecnicos
+                        </div>
+                        <i class="fas fa-chevron-down toggle-icon"></i>
+                    </div>
+                    <div class="tech-body" id="techBody">
+                        <div class="tech-grid">
+                            <!-- Video Stream -->
+                            {% if media_info.get('video_codec') %}
+                            <div class="tech-section-label"><i class="fas fa-video"></i> Stream de Video</div>
+
+                            <div class="tech-item">
+                                <span class="tech-label">Codec</span>
+                                <span class="tech-value highlight">{{ media_info.get('video_codec', '-') }}{% if media_info.get('video_profile') %} ({{ media_info['video_profile'] }}){% endif %}</span>
+                            </div>
+                            <div class="tech-item">
+                                <span class="tech-label">Resolucion</span>
+                                <span class="tech-value highlight">{{ media_info.get('width', 0) }}x{{ media_info.get('height', 0) }}</span>
+                            </div>
+                            {% if media_info.get('fps') and media_info['fps'] > 0 %}
+                            <div class="tech-item">
+                                <span class="tech-label">Framerate</span>
+                                <span class="tech-value">{{ media_info['fps'] }} fps</span>
+                            </div>
+                            {% endif %}
+                            {% if media_info.get('video_bitrate') and media_info['video_bitrate'] > 0 %}
+                            <div class="tech-item">
+                                <span class="tech-label">Bitrate Video</span>
+                                <span class="tech-value">{{ '%.1f' % (media_info['video_bitrate'] / 1000000) }} Mbps</span>
+                            </div>
+                            {% endif %}
+                            {% if media_info.get('pix_fmt') %}
+                            <div class="tech-item">
+                                <span class="tech-label">Pixel Format</span>
+                                <span class="tech-value">{{ media_info['pix_fmt'] }}</span>
+                            </div>
+                            {% endif %}
+                            {% if media_info.get('color_space') %}
+                            <div class="tech-item">
+                                <span class="tech-label">Color Space</span>
+                                <span class="tech-value">{{ media_info['color_space'] }}</span>
+                            </div>
+                            {% endif %}
+                            {% endif %}
+
+                            <!-- Audio Stream -->
+                            {% if media_info.get('audio_codec') %}
+                            <div class="tech-separator"></div>
+                            <div class="tech-section-label"><i class="fas fa-headphones"></i> Stream de Audio</div>
+
+                            <div class="tech-item">
+                                <span class="tech-label">Codec</span>
+                                <span class="tech-value pink">{{ media_info.get('audio_codec', '-') }}{% if media_info.get('audio_profile') %} ({{ media_info['audio_profile'] }}){% endif %}</span>
+                            </div>
+                            {% if media_info.get('sample_rate') and media_info['sample_rate'] > 0 %}
+                            <div class="tech-item">
+                                <span class="tech-label">Sample Rate</span>
+                                <span class="tech-value">{{ (media_info['sample_rate'] / 1000)|round(1) }} kHz</span>
+                            </div>
+                            {% endif %}
+                            {% if media_info.get('channels') %}
+                            <div class="tech-item">
+                                <span class="tech-label">Canales</span>
+                                <span class="tech-value">{{ 'Stereo' if media_info['channels'] == 2 else 'Mono' if media_info['channels'] == 1 else '5.1 Surround' if media_info['channels'] == 6 else '%d canales' % media_info['channels'] }}</span>
+                            </div>
+                            {% endif %}
+                            {% if media_info.get('audio_bitrate') and media_info['audio_bitrate'] > 0 %}
+                            <div class="tech-item">
+                                <span class="tech-label">Bitrate Audio</span>
+                                <span class="tech-value">{{ (media_info['audio_bitrate'] / 1000)|int }} kbps</span>
+                            </div>
+                            {% endif %}
+                            {% endif %}
+
+                            <!-- Container Info -->
+                            <div class="tech-separator"></div>
+                            <div class="tech-section-label"><i class="fas fa-box"></i> Contenedor</div>
+
+                            {% if media_info.get('container') %}
+                            <div class="tech-item">
+                                <span class="tech-label">Formato</span>
+                                <span class="tech-value">{{ media_info['container']|upper }}</span>
+                            </div>
+                            {% endif %}
+                            {% if media_info.get('bitrate') and media_info['bitrate'] > 0 %}
+                            <div class="tech-item">
+                                <span class="tech-label">Bitrate Total</span>
+                                <span class="tech-value">{{ '%.2f' % (media_info['bitrate'] / 1000000) }} Mbps</span>
+                            </div>
+                            {% endif %}
+                            {% if file_size_bytes %}
+                            <div class="tech-item">
+                                <span class="tech-label">Tamano Archivo</span>
+                                <span class="tech-value">{{ '{:,}'.format(file_size_bytes) }} bytes</span>
+                            </div>
+                            {% endif %}
+                            <div class="tech-item">
+                                <span class="tech-label">Archivo</span>
+                                <span class="tech-value" style="font-size:0.7rem; word-break:break-all;">{{ filename }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Action Buttons -->
+                <div class="player-actions">
+                    <a href="/api/public-download/{{ token }}" class="action-btn download-btn" download>
+                        <i class="fas fa-download"></i> Descargar
+                    </a>
+                    {% if is_video %}
+                    <button id="pipBtn" class="action-btn secondary-btn" title="Picture-in-Picture" style="display:none">
+                        <i class="fas fa-compress"></i> PiP
+                    </button>
+                    {% endif %}
+                    <button id="bgPlayBtn" class="action-btn secondary-btn" title="Mantener pantalla encendida">
+                        <i class="fas fa-moon"></i> Pantalla activa
+                    </button>
+                </div>
+
+                <div id="bgStatus" class="status-badge">
+                    <span class="pulse-dot"></span>
+                    <span id="bgStatusText">Pantalla activa</span>
+                </div>
+
+                <!-- Footer Branding -->
+                <div class="player-footer">
+                    <div class="brand-block">
+                        <div class="brand-logo"><i class="fas fa-download"></i></div>
+                        <div class="brand-text">
+                            <span class="brand-name">Video<span class="brand-highlight">Down</span></span>
+                            <span class="brand-sub">Compartido via VideoDown</span>
+                        </div>
+                    </div>
+                    <div class="brand-author">
+                        <i class="fas fa-code"></i> Desarrollado por <span class="author-name">KiKoSo</span>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if not error and (is_video or is_audio) %}
+    <script>
+    (function() {
+        const media = document.getElementById('mediaPlayer');
+        const pipBtn = document.getElementById('pipBtn');
+        const bgPlayBtn = document.getElementById('bgPlayBtn');
+        const bgStatus = document.getElementById('bgStatus');
+        const bgStatusText = document.getElementById('bgStatusText');
+        if (!media) return;
+
+        // ===== Start time from URL param =====
+        {% if start_time and start_time > 0 %}
+        media.addEventListener('loadedmetadata', () => {
+            if ({{ start_time }} > 0 && {{ start_time }} < media.duration) {
+                media.currentTime = {{ start_time }};
+            }
+        }, { once: true });
+        {% endif %}
+
+        // ===== Auto-hide status badge =====
+        const statusBadge = document.querySelector('.video-status-badge');
+        if (statusBadge) {
+            setTimeout(() => statusBadge.classList.add('fade-out'), 3000);
+        }
+
+        // ===== Tech Panel Toggle =====
+        const techToggle = document.getElementById('techToggle');
+        const techBody = document.getElementById('techBody');
+        if (techToggle && techBody) {
+            techToggle.addEventListener('click', () => {
+                techToggle.classList.toggle('open');
+                techBody.classList.toggle('open');
+            });
+        }
+
+        // ===== Countdown Timer =====
+        {% if not is_saved and expires_at %}
+        const expiresAt = {{ expires_at }};
+        const countdownEl = document.getElementById('countdownTimer');
+        const expiryBadge = document.getElementById('expiryBadge');
+        const countdownBar = document.getElementById('countdownBar');
+        function updateCountdown() {
+            const remaining = Math.max(0, expiresAt - (Date.now() / 1000));
+            if (remaining <= 0) {
+                if (countdownEl) countdownEl.textContent = 'EXPIRADO';
+                if (expiryBadge) expiryBadge.textContent = 'Expirado';
+                if (countdownBar) countdownBar.style.borderColor = 'rgba(239,68,68,0.3)';
+                return;
+            }
+            const mins = Math.floor(remaining / 60);
+            const secs = Math.floor(remaining % 60);
+            const timeStr = mins + ':' + String(secs).padStart(2, '0');
+            if (countdownEl) countdownEl.textContent = timeStr;
+            if (expiryBadge) expiryBadge.textContent = 'Expira en ' + timeStr;
+            requestAnimationFrame(() => setTimeout(updateCountdown, 1000));
+        }
+        updateCountdown();
+        {% endif %}
+
+        // ===== 1. Media Session API =====
+        if ('mediaSession' in navigator) {
+            navigator.mediaSession.metadata = new MediaMetadata({
+                title: {{ (title or 'Video')|tojson }},
+                artist: 'VideoDown by KiKoSo',
+                {% if thumbnail %}
+                artwork: [
+                    { src: {{ thumbnail|tojson }}, sizes: '512x512', type: 'image/jpeg' }
+                ]
+                {% endif %}
+            });
+            navigator.mediaSession.setActionHandler('play', () => media.play());
+            navigator.mediaSession.setActionHandler('pause', () => media.pause());
+            navigator.mediaSession.setActionHandler('seekbackward', (d) => {
+                media.currentTime = Math.max(0, media.currentTime - (d.seekOffset || 10));
+            });
+            navigator.mediaSession.setActionHandler('seekforward', (d) => {
+                media.currentTime = Math.min(media.duration || 0, media.currentTime + (d.seekOffset || 10));
+            });
+            navigator.mediaSession.setActionHandler('seekto', (d) => {
+                if (d.fastSeek && 'fastSeek' in media) media.fastSeek(d.seekTime);
+                else media.currentTime = d.seekTime;
+            });
+        }
+
+        // ===== 2. Wake Lock API =====
+        let wakeLock = null;
+        let wakeLockEnabled = false;
+
+        async function requestWakeLock() {
+            if (!('wakeLock' in navigator)) return false;
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+                wakeLock.addEventListener('release', () => {
+                    if (wakeLockEnabled && document.visibilityState === 'visible' && !media.paused) {
+                        requestWakeLock();
+                    }
+                });
+                return true;
+            } catch (e) { return false; }
+        }
+
+        function releaseWakeLock() {
+            if (wakeLock) { wakeLock.release(); wakeLock = null; }
+        }
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && wakeLockEnabled && !media.paused) {
+                requestWakeLock();
+            }
+        });
+
+        bgPlayBtn.addEventListener('click', async () => {
+            wakeLockEnabled = !wakeLockEnabled;
+            if (wakeLockEnabled) {
+                const ok = await requestWakeLock();
+                bgPlayBtn.classList.add('active');
+                bgPlayBtn.innerHTML = '<i class="fas fa-sun"></i> Pantalla activa';
+                bgStatus.classList.add('visible');
+                bgStatusText.textContent = ok ? 'Pantalla activa — no se apagara durante la reproduccion' : 'Tu navegador no soporta Wake Lock';
+            } else {
+                releaseWakeLock();
+                bgPlayBtn.classList.remove('active');
+                bgPlayBtn.innerHTML = '<i class="fas fa-moon"></i> Pantalla activa';
+                bgStatus.classList.remove('visible');
+            }
+        });
+
+        media.addEventListener('pause', () => { if (wakeLockEnabled) releaseWakeLock(); });
+        media.addEventListener('play', () => { if (wakeLockEnabled) requestWakeLock(); });
+
+        // ===== 3. Picture-in-Picture =====
+        {% if is_video %}
+        if (document.pictureInPictureEnabled) {
+            pipBtn.style.display = '';
+            pipBtn.addEventListener('click', async () => {
+                try {
+                    if (document.pictureInPictureElement) await document.exitPictureInPicture();
+                    else await media.requestPictureInPicture();
+                } catch (e) { console.log('PiP failed:', e); }
+            });
+            media.addEventListener('enterpictureinpicture', () => {
+                pipBtn.innerHTML = '<i class="fas fa-expand"></i> Salir PiP';
+                pipBtn.classList.add('active');
+            });
+            media.addEventListener('leavepictureinpicture', () => {
+                pipBtn.innerHTML = '<i class="fas fa-compress"></i> PiP';
+                pipBtn.classList.remove('active');
+            });
+        }
+        {% endif %}
+
+        // ===== 4. AudioContext for background audio =====
+        let audioCtx = null;
+        media.addEventListener('play', () => {
+            if (!audioCtx) {
+                try {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    const source = audioCtx.createMediaElementSource(media);
+                    source.connect(audioCtx.destination);
+                } catch(e) {}
+            }
+            if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        });
+    })();
+    </script>
+    {% endif %}
+</body>
+
+</html>
