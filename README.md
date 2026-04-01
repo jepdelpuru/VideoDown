@@ -31,12 +31,10 @@ Aplicacion web para descargar videos de mas de 1000 plataformas (YouTube, TikTok
 | Tiempo real | WebSocket (Socket.IO) |
 | PWA | Service Worker + Web App Manifest |
 | Contenedores | Docker + Docker Compose |
-| Acceso externo | Cloudflare Tunnel |
 
 ## Requisitos previos
 
 - Docker y Docker Compose
-- Token de Cloudflare Tunnel (opcional, para acceso externo)
 
 ## Instalacion
 
@@ -46,18 +44,8 @@ Aplicacion web para descargar videos de mas de 1000 plataformas (YouTube, TikTok
    cd VideoDown
    ```
 
-2. **(Opcional)** Si quieres acceso externo via Cloudflare Tunnel, crea el archivo `.env`:
+2. Levanta el contenedor:
    ```bash
-   cp .env.example .env
-   # Edita .env con tu token de Cloudflare Tunnel
-   ```
-
-3. Levanta los contenedores:
-   ```bash
-   # Solo la app (uso local):
-   docker-compose up -d videodown
-
-   # App + Cloudflare Tunnel (acceso externo, requiere .env):
    docker-compose up -d
    ```
 
@@ -75,7 +63,7 @@ torrentweb/
 ├── app.py                 # Aplicacion Flask principal (~2200 lineas)
 ├── requirements.txt       # Dependencias Python
 ├── Dockerfile             # Imagen Docker (Python 3.11 + FFmpeg + Deno)
-├── docker-compose.yml     # Servicios: Flask + Cloudflare Tunnel
+├── docker-compose.yml     # Servicio Docker
 ├── templates/
 │   ├── login.html         # Pagina de autenticacion
 │   ├── index.html         # Interfaz principal (SPA)
@@ -95,13 +83,6 @@ torrentweb/
 3. Selecciona formato y calidad
 4. La descarga se anade a tu cola y se procesa automaticamente
 5. Descarga, reproduce en el navegador o comparte el enlace
-
-## Docker Compose
-
-El archivo `docker-compose.yml` define dos servicios:
-
-- **videodown**: Aplicacion Flask en el puerto 5080
-- **tunnel**: Cloudflare Tunnel para acceso externo seguro (requiere `CF_TUNNEL_TOKEN`)
 
 ## Licencia
 
