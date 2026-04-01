@@ -42,22 +42,31 @@ Aplicacion web para descargar videos de mas de 1000 plataformas (YouTube, TikTok
 
 1. Clona el repositorio:
    ```bash
-   git clone https://github.com/jepdelpuru/torrentweb.git
-   cd torrentweb
+   git clone https://github.com/jepdelpuru/VideoDown.git
+   cd VideoDown
    ```
 
-2. Crea el archivo `.env`:
+2. **(Opcional)** Si quieres acceso externo via Cloudflare Tunnel, crea el archivo `.env`:
    ```bash
-   # Cloudflare Tunnel Token (opcional)
-   CF_TUNNEL_TOKEN=tu_token_aqui
+   cp .env.example .env
+   # Edita .env con tu token de Cloudflare Tunnel
    ```
 
 3. Levanta los contenedores:
    ```bash
+   # Solo la app (uso local):
+   docker-compose up -d videodown
+
+   # App + Cloudflare Tunnel (acceso externo, requiere .env):
    docker-compose up -d
    ```
 
 4. Accede a la aplicacion en `http://localhost:5080`
+
+5. Inicia sesion con el usuario admin por defecto:
+   - **Usuario:** `caski`
+   - **Contrasena:** `pijkl567`
+   - Cambia la contrasena desde el panel de administracion despues del primer login
 
 ## Estructura del proyecto
 
