@@ -213,13 +213,13 @@ def init_db():
         c.execute(f"ALTER TABLE users ADD COLUMN max_quota_bytes INTEGER DEFAULT {DOWNLOAD_QUOTA_BYTES}")
         log.info("Migration: added max_quota_bytes column to users table")
     # Create default admin user if not exists
-    c.execute("SELECT * FROM users WHERE username = ?", ("caski",))
+    c.execute("SELECT * FROM users WHERE username = ?", ("admin",))
     if not c.fetchone():
         c.execute(
             "INSERT INTO users (id, username, password_hash, is_admin) VALUES (?, ?, ?, ?)",
-            (str(uuid.uuid4()), "caski", generate_password_hash("pijkl567"), 1)
+            (str(uuid.uuid4()), "admin", generate_password_hash("admin123"), 1)
         )
-        log.info("Default admin user 'caski' created.")
+        log.info("Default admin user 'admin' created.")
     conn.commit()
     conn.close()
 

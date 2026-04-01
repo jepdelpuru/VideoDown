@@ -64,8 +64,8 @@ Aplicacion web para descargar videos de mas de 1000 plataformas (YouTube, TikTok
 4. Accede a la aplicacion en `http://localhost:5080`
 
 5. Inicia sesion con el usuario admin por defecto:
-   - **Usuario:** `caski`
-   - **Contrasena:** `pijkl567`
+   - **Usuario:** `admin`
+   - **Contrasena:** `admin123`
    - Cambia la contrasena desde el panel de administracion despues del primer login
 
 ## Estructura del proyecto
