@@ -212,6 +212,12 @@ def init_db():
     except sqlite3.OperationalError:
         c.execute(f"ALTER TABLE users ADD COLUMN max_quota_bytes INTEGER DEFAULT {DOWNLOAD_QUOTA_BYTES}")
         log.info("Migration: added max_quota_bytes column to users table")
+    # Migration: add view_count column to downloads table
+    try:
+        c.execute("SELECT view_count FROM downloads LIMIT 1")
+    except sqlite3.OperationalError:
+        c.execute("ALTER TABLE downloads ADD COLUMN view_count INTEGER DEFAULT 0")
+        log.info("Migration: added view_count column to downloads table")
     # Create default admin user if not exists
     c.execute("SELECT * FROM users WHERE username = ?", ("admin",))
     if not c.fetchone():
@@ -336,7 +342,7 @@ def get_user_downloads(user_id):
         conn = get_db()
         downloads = conn.execute(
             """SELECT id, filename, file_size, file_size_str, video_title, video_url,
-                      thumbnail, quality, created_at, expires_at
+                      thumbnail, quality, created_at, expires_at, view_count
                FROM downloads
                WHERE user_id = ? AND expires_at > ? AND is_saved = 0
                ORDER BY created_at DESC""",
@@ -844,6 +850,7 @@ def recent_downloads():
             'expires_at': d['expires_at'],
             'remaining_seconds': int(remaining),
             'remaining_text': format_remaining_time(remaining),
+            'view_count': d['view_count'] if 'view_count' in d.keys() else 0,
         })
     return jsonify(result)
 
@@ -926,7 +933,7 @@ def saved_downloads():
         if collection_id:
             downloads = conn.execute(
                 """SELECT d.id, d.filename, d.file_size, d.file_size_str, d.video_title,
-                          d.video_url, d.thumbnail, d.quality, d.created_at
+                          d.video_url, d.thumbnail, d.quality, d.created_at, d.view_count
                    FROM downloads d
                    JOIN collection_downloads cd ON d.id = cd.download_id
                    WHERE d.user_id = ? AND d.is_saved = 1 AND cd.collection_id = ?
@@ -936,7 +943,7 @@ def saved_downloads():
         else:
             downloads = conn.execute(
                 """SELECT id, filename, file_size, file_size_str, video_title, video_url,
-                          thumbnail, quality, created_at
+                          thumbnail, quality, created_at, view_count
                    FROM downloads
                    WHERE user_id = ? AND is_saved = 1
                    ORDER BY created_at DESC""",
@@ -1216,7 +1223,7 @@ def public_player(token):
     record = conn.execute(
         """SELECT d.id, d.filename, d.filepath, d.video_title, d.thumbnail,
                   d.quality, d.file_size_str, d.file_size, d.expires_at,
-                  d.is_saved, d.created_at, d.video_url
+                  d.is_saved, d.created_at, d.video_url, d.view_count
            FROM share_tokens s
            JOIN downloads d ON s.download_id = d.id
            WHERE s.token = ?""",
@@ -1271,7 +1278,8 @@ def public_player(token):
                            created_at=record['created_at'],
                            video_url=record['video_url'],
                            media_info=media_info,
-                           start_time=start_time)
+                           start_time=start_time,
+                           view_count=record['view_count'] or 0)
 
 
 @app.route('/api/public-stream/<token>')
@@ -1300,6 +1308,44 @@ def public_stream(token):
     ext = os.path.splitext(filepath)[1].lower()
     mime = MIME_TYPES.get(ext)
     return send_file(filepath, mimetype=mime) if mime else send_file(filepath)
+
+
+@app.route('/api/track-view/<download_id>', methods=['POST'])
+@login_required
+def track_view(download_id):
+    """Increment view count for a download (internal player)."""
+    conn = get_db()
+    conn.execute("UPDATE downloads SET view_count = view_count + 1 WHERE id = ?", (download_id,))
+    conn.commit()
+    row = conn.execute("SELECT view_count FROM downloads WHERE id = ?", (download_id,)).fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify({"view_count": row['view_count']})
+
+
+@app.route('/api/track-public-view/<token>', methods=['POST'])
+def track_public_view(token):
+    """Increment view count for a public shared video."""
+    conn = get_db()
+    record = conn.execute(
+        """SELECT d.id, d.expires_at, d.is_saved
+           FROM share_tokens s
+           JOIN downloads d ON s.download_id = d.id
+           WHERE s.token = ?""",
+        (token,)
+    ).fetchone()
+    if not record:
+        conn.close()
+        return jsonify({"error": "Not found"}), 404
+    if not record['is_saved'] and record['expires_at'] <= time.time():
+        conn.close()
+        return jsonify({"error": "Expired"}), 410
+    conn.execute("UPDATE downloads SET view_count = view_count + 1 WHERE id = ?", (record['id'],))
+    conn.commit()
+    row = conn.execute("SELECT view_count FROM downloads WHERE id = ?", (record['id'],)).fetchone()
+    conn.close()
+    return jsonify({"view_count": row['view_count']})
 
 
 @app.route('/api/public-download/<token>')

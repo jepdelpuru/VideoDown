@@ -3207,6 +3207,22 @@ body {
     font-weight: 500;
 }
 
+.view-count-badge {
+    color: #22d3ee !important;
+    font-weight: 500;
+}
+.view-count-badge i {
+    color: #22d3ee;
+}
+
+.view-count-tag {
+    background: linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(99, 102, 241, 0.1)) !important;
+    border-color: rgba(34, 211, 238, 0.25) !important;
+}
+.view-count-tag i {
+    color: #22d3ee !important;
+}
+
 .saved-item {
     border-left: 3px solid var(--warning);
 }

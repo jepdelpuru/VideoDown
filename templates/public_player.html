@@ -213,6 +213,11 @@
         .quick-tag.pink i { color: var(--accent-pink); }
         .quick-tag.green i { color: var(--success); }
         .quick-tag.warning i { color: var(--warning); }
+        .view-count-tag {
+            background: linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(99, 102, 241, 0.1));
+            border-color: rgba(34, 211, 238, 0.25);
+        }
+        .view-count-tag i { color: #22d3ee; }
 
         /* === Technical Panel === */
         .tech-panel {
@@ -607,6 +612,7 @@
                     {% if media_info.get('audio_codec') %}
                     <span class="quick-tag"><i class="fas fa-headphones"></i> {{ media_info['audio_codec'] }}</span>
                     {% endif %}
+                    <span class="quick-tag view-count-tag" id="viewCountTag"><i class="fas fa-eye"></i> <span id="viewCountNum">{{ view_count }}</span> {{ 'vista' if view_count == 1 else 'vistas' }}</span>
                 </div>
 
                 <!-- Countdown for expiring videos -->
@@ -782,6 +788,18 @@
             }
         }, { once: true });
         {% endif %}
+
+        // ===== Track public view =====
+        fetch('/api/track-public-view/{{ token }}', { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.view_count !== undefined) {
+                    const el = document.getElementById('viewCountNum');
+                    if (el) el.textContent = data.view_count;
+                    const tag = document.getElementById('viewCountTag');
+                    if (tag) tag.lastChild.textContent = ' ' + (data.view_count === 1 ? 'vista' : 'vistas');
+                }
+            }).catch(() => {});
 
         // ===== Auto-hide status badge =====
         const statusBadge = document.querySelector('.video-status-badge');

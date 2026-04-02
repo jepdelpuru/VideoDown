@@ -885,6 +885,7 @@
                     <div class="recent-meta">
                         <span><i class="fas fa-file"></i> ${dl.file_size_str}</span>
                         <span><i class="fas fa-tag"></i> ${escapeHtml(dl.quality)}</span>
+                        ${dl.view_count ? `<span class="view-count-badge"><i class="fas fa-eye"></i> ${dl.view_count}</span>` : ''}
                         <span class="recent-countdown" data-expires="${dl.expires_at}">
                             <i class="fas fa-clock"></i> ${formatRemainingTime(remaining)}
                         </span>
@@ -1277,6 +1278,7 @@
                     <div class="recent-meta">
                         <span><i class="fas fa-file"></i> ${dl.file_size_str}</span>
                         <span><i class="fas fa-tag"></i> ${escapeHtml(dl.quality)}</span>
+                        ${dl.view_count ? `<span class="view-count-badge"><i class="fas fa-eye"></i> ${dl.view_count}</span>` : ''}
                         <span class="saved-badge"><i class="fas fa-bookmark"></i> Guardado</span>
                     </div>
                     ${collectionBadges}
@@ -1747,6 +1749,18 @@
                 }, { once: true });
             }
         });
+
+        // Track view and show count in quick tags
+        fetch(`/api/track-view/${downloadId}`, { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.view_count !== undefined) {
+                    const viewTag = document.createElement('span');
+                    viewTag.className = 'quick-tag view-count-tag';
+                    viewTag.innerHTML = `<i class="fas fa-eye"></i> ${data.view_count} ${data.view_count === 1 ? 'vista' : 'vistas'}`;
+                    elements.playerQuickTags.prepend(viewTag);
+                }
+            }).catch(() => {});
 
         // Show overlay
         elements.playerOverlay.style.display = 'flex';
