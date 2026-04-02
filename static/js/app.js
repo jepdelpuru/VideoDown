@@ -1750,17 +1750,9 @@
             }
         });
 
-        // Track view and show count in quick tags
-        fetch(`/api/track-view/${downloadId}`, { method: 'POST' })
-            .then(r => r.json())
-            .then(data => {
-                if (data.view_count !== undefined) {
-                    const viewTag = document.createElement('span');
-                    viewTag.className = 'quick-tag view-count-tag';
-                    viewTag.innerHTML = `<i class="fas fa-eye"></i> ${data.view_count} ${data.view_count === 1 ? 'vista' : 'vistas'}`;
-                    elements.playerQuickTags.prepend(viewTag);
-                }
-            }).catch(() => {});
+        // Track view (result used later after media-info loads)
+        const viewCountPromise = fetch(`/api/track-view/${downloadId}`, { method: 'POST' })
+            .then(r => r.json()).catch(() => null);
 
         // Show overlay
         elements.playerOverlay.style.display = 'flex';
@@ -1787,6 +1779,15 @@
                     elements.playerTechBody.innerHTML = renderTechPanel(data.media_info, data.file_size_bytes, data.filename);
                     elements.playerTechPanel.style.display = '';
                 }
+                // Append view count tag after quick tags are rendered
+                viewCountPromise.then(vcData => {
+                    if (vcData && vcData.view_count !== undefined) {
+                        const viewTag = document.createElement('span');
+                        viewTag.className = 'quick-tag view-count-tag';
+                        viewTag.innerHTML = `<i class="fas fa-eye"></i> ${vcData.view_count} ${vcData.view_count === 1 ? 'vista' : 'vistas'}`;
+                        elements.playerQuickTags.appendChild(viewTag);
+                    }
+                });
                 // Original link button
                 if (data.video_url) {
                     elements.playerOriginalBtn.href = data.video_url;
